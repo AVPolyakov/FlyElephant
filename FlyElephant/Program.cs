@@ -25,7 +25,13 @@ namespace FlyElephant
             if (startWord == null) return null;
             var endWord = wordInfos.SingleOrDefault(_ => _.Value == end);
             if (endWord == null) return null;
-            return BreadthFirstSearch(startWord, endWord, wordInfos, wordLength)
+            //заполняем списки WordInfo.Groupings
+            foreach (var i in Enumerable.Range(0, wordLength))
+                foreach (var grouping in wordInfos.GroupBy(info => info.Value.Remove(i, 1)))
+                    if (grouping.Skip(1).Any())
+                        foreach (var wordInfo in grouping)
+                            wordInfo.Groupings.Add(grouping);
+            return BreadthFirstSearch(startWord, endWord)
                 ? GetPath(startWord, endWord).Reverse().Select(_ => _.Value)
                 : null;
         }
@@ -33,23 +39,15 @@ namespace FlyElephant
         /// <summary>
         /// https://en.wikipedia.org/wiki/Breadth-first_search#Pseudocode
         /// </summary>
-        private static bool BreadthFirstSearch(WordInfo startWord, WordInfo endWord, List<WordInfo> wordInfos, int wordLength)
+        private static bool BreadthFirstSearch(WordInfo startWord, WordInfo endWord)
         {
-            if (startWord.Index == endWord.Index) return true;
-
-            //заполняем списки WordInfo.Groupings
-            foreach (var i in Enumerable.Range(0, wordLength))
-                foreach (var grouping in wordInfos.GroupBy(info => info.Value.Remove(i, 1)))
-                    if (grouping.Skip(1).Any())
-                        foreach (var wordInfo in grouping)
-                            wordInfo.Groupings.Add(grouping);
-
             var queue = new Queue<WordInfo>();
             startWord.Parent = startWord; //помечаем первоначальное слово как просмотренное
+            if (startWord.Index == endWord.Index) return true;
             queue.Enqueue(startWord);
             while (queue.Count > 0)
             {
-                var current = queue.Dequeue();                
+                var current = queue.Dequeue();
                 foreach (var adjacent in current.Groupings.SelectMany(grouping => grouping))
                     if (adjacent.Parent == null)
                     {
