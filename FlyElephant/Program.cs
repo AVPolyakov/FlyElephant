@@ -9,21 +9,21 @@ namespace FlyElephant
         public static void Main()
         {
             var path = FindPath("КОТ", "ТОН", new[] {"КОТ", "ТОН", "НОТА", "КОТЫ", "РОТ", "РОТА", "ТОТ"});
-            if (path != null)
-                foreach (var wordInfo in path)
+            if (path.HasValue)
+                foreach (var wordInfo in path.Value)
                     Console.WriteLine(wordInfo);
             else
                 Console.WriteLine("Цепочки не существует.");
         }
 
-        public static IEnumerable<string> FindPath(string start, string end, IEnumerable<string> words)
+        public static Option<IEnumerable<string>> FindPath(string start, string end, IEnumerable<string> words)
         {
             var wordLength = start.Length;
             var strings = words.Where(value => value.Length == wordLength).ToArray();
             var startIndex = Array.IndexOf(strings, start);
-            if (startIndex < 0) return null;
+            if (startIndex < 0) return new Option<IEnumerable<string>>();
             var endIndex = Array.IndexOf(strings, end);
-            if (endIndex < 0) return null;
+            if (endIndex < 0) return new Option<IEnumerable<string>>();
             var groupings = Enumerable.Range(0, wordLength).SelectMany(
                 i => Enumerable.Range(0, strings.Length).GroupBy(index => strings[index].Remove(i, 1))
                     .Where(grouping => grouping.Skip(1).Any())
@@ -32,8 +32,8 @@ namespace FlyElephant
             var parents = BreadthFirstSearch(startIndex, endIndex, 
                 current => groupings[current].SelectMany(grouping => grouping));
             return parents.ContainsKey(endIndex)
-                ? GetPath(startIndex, endIndex, parents).Reverse().Select(index => strings[index])
-                : null;
+                ? GetPath(startIndex, endIndex, parents).Reverse().Select(index => strings[index]).AsOption()
+                : new Option<IEnumerable<string>>();
         }
 
         /// <summary>
