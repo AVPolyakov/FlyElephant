@@ -19,69 +19,55 @@ namespace FlyElephant
         public static IEnumerable<string> FindPath(string start, string end, IEnumerable<string> words)
         {
             var wordLength = start.Length;
-            var wordInfos = words.Where(value => value.Length == wordLength)
-                .Select((value, i) => new WordInfo(value, i)).ToList();
-            var startWord = wordInfos.SingleOrDefault(_ => _.Value == start);
-            if (startWord == null) return null;
-            var endWord = wordInfos.SingleOrDefault(_ => _.Value == end);
-            if (endWord == null) return null;
-            //заполняем списки WordInfo.Groupings
-            foreach (var i in Enumerable.Range(0, wordLength))
-                foreach (var grouping in wordInfos.GroupBy(info => info.Value.Remove(i, 1)))
-                    if (grouping.Skip(1).Any())
-                        foreach (var wordInfo in grouping)
-                            wordInfo.Groupings.Add(grouping);
-            return BreadthFirstSearch(startWord, endWord)
-                ? GetPath(startWord, endWord).Reverse().Select(_ => _.Value)
+            var strings = words.Where(value => value.Length == wordLength).ToArray();
+            var startIndex = Array.IndexOf(strings, start);
+            if (startIndex < 0) return null;
+            var endIndex = Array.IndexOf(strings, end);
+            if (endIndex < 0) return null;
+            var groupings = Enumerable.Range(0, wordLength).SelectMany(
+                i => Enumerable.Range(0, strings.Length).GroupBy(index => strings[index].Remove(i, 1))
+                    .Where(grouping => grouping.Skip(1).Any())
+                    .SelectMany(grouping => grouping.Select(index => new {index, grouping})))
+                .ToLookup(_ => _.index, _ => _.grouping);
+            var parents = BreadthFirstSearch(startIndex, endIndex, 
+                current => groupings[current].SelectMany(grouping => grouping));
+            return parents.ContainsKey(endIndex)
+                ? GetPath(startIndex, endIndex, parents).Reverse().Select(index => strings[index])
                 : null;
         }
 
         /// <summary>
         /// https://en.wikipedia.org/wiki/Breadth-first_search#Pseudocode
         /// </summary>
-        private static bool BreadthFirstSearch(WordInfo startWord, WordInfo endWord)
+        private static Dictionary<int, int> BreadthFirstSearch(int start, int end, Func<int, IEnumerable<int>> adjacents)
         {
-            var queue = new Queue<WordInfo>();
-            startWord.Parent = startWord; //помечаем первоначальное слово как просмотренное
-            if (startWord.Index == endWord.Index) return true;
-            queue.Enqueue(startWord);
+            var dictionary = new Dictionary<int, int> {{start, -1}};
+            if (start == end) return dictionary;
+            var queue = new Queue<int>();
+            queue.Enqueue(start);
             while (queue.Count > 0)
             {
                 var current = queue.Dequeue();
-                foreach (var adjacent in current.Groupings.SelectMany(grouping => grouping))
-                    if (adjacent.Parent == null)
+                foreach (var adjacent in adjacents(current))
+                    if (!dictionary.ContainsKey(adjacent))
                     {
-                        adjacent.Parent = current;
-                        if (adjacent.Index == endWord.Index) return true;
+                        dictionary.Add(adjacent, current);
+                        if (adjacent == end) return dictionary;
                         queue.Enqueue(adjacent);
                     }
             }
-            return false;
+            return dictionary;
         }
 
-        private class WordInfo
+        private static IEnumerable<int> GetPath(int start, int end, Dictionary<int, int> parents)
         {
-            public string Value { get; }
-            public int Index { get; }
-            public readonly List<IGrouping<string, WordInfo>> Groupings = new List<IGrouping<string, WordInfo>>();
-            public WordInfo Parent { get; set; }
-
-            public WordInfo(string value, int index)
-            {
-                Value = value;
-                Index = index;
-            }
-        }
-
-        private static IEnumerable<WordInfo> GetPath(WordInfo startWord, WordInfo endWord)
-        {
-            var current = endWord;
-            while (current.Index != startWord.Index)
+            var current = end;
+            while (current != start)
             {
                 yield return current;
-                current = current.Parent;
+                current = parents[current];
             }
-            yield return startWord;
+            yield return start;
         }
     }
 }
