@@ -1,22 +1,78 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace FlyElephant
 {
     public class Program
     {
-        public static void Main()
+        public static void Main(string[] args)
         {
-            var path = FindPath("КОТ", "ТОН", new[] {"КОТ", "ТОН", "НОТА", "КОТЫ", "РОТ", "РОТА", "ТОТ"});
-            if (path.HasValue)
-                foreach (var wordInfo in path.Value)
-                    Console.WriteLine(wordInfo);
+            FindChain(args, File.ReadLines);
+        }
+
+        public static void FindChain(string[] args, Func<string, IEnumerable<string>> readLines)
+        {
+            if (args.Length < 1)
+            {
+                Console.WriteLine("Не задан путь к файлу, в котором указано начальное и конечное слово.");
+                return;
+            }
+            var startEndPath = args[0];
+            IEnumerable<string> startEndLines;
+            try
+            {
+                startEndLines = readLines(startEndPath);
+            }
+            catch (Exception e)
+            {
+                WriteException(e);
+                return;
+            }
+            var startEnd = startEndLines.Take(2).ToArray();
+            if (startEnd.Length < 1)
+            {
+                Console.WriteLine("Не указано начальное слово.");
+                return;
+            }
+            var start = startEnd[0];
+            if (startEnd.Length < 2)
+            {
+                Console.WriteLine("Не указано конечное слово.");
+                return;
+            }
+            var end = startEnd[1];
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Не задан путь к файлу, который содержит словарь.");
+                return;
+            }
+            var dictionaryPath = args[1];
+            IEnumerable<string> dictionaryLines;
+            try
+            {
+                dictionaryLines = readLines(dictionaryPath);
+            }
+            catch (Exception e)
+            {
+                WriteException(e);
+                return;
+            }
+            var chain = FindChain(start, end, dictionaryLines);
+            if (chain.HasValue)
+                foreach (var word in chain.Value)
+                    Console.WriteLine(word);
             else
                 Console.WriteLine("Цепочки не существует.");
         }
 
-        public static Option<IEnumerable<string>> FindPath(string start, string end, IEnumerable<string> words)
+        private static void WriteException(Exception e)
+        {
+            Console.WriteLine(e.Message);
+        }
+
+        public static Option<IEnumerable<string>> FindChain(string start, string end, IEnumerable<string> words)
         {
             var wordLength = start.Length;
             var strings = words.Where(value => value.Length == wordLength).ToArray();
@@ -32,7 +88,7 @@ namespace FlyElephant
             var parents = BreadthFirstSearch(startIndex, endIndex, 
                 current => groupings[current].SelectMany(grouping => grouping));
             return parents.ContainsKey(endIndex)
-                ? GetPath(startIndex, endIndex, parents).Reverse().Select(index => strings[index]).AsOption()
+                ? GetChain(startIndex, endIndex, parents).Reverse().Select(index => strings[index]).AsOption()
                 : new Option<IEnumerable<string>>();
         }
 
@@ -59,7 +115,7 @@ namespace FlyElephant
             return dictionary;
         }
 
-        private static IEnumerable<int> GetPath(int start, int end, Dictionary<int, int> parents)
+        private static IEnumerable<int> GetChain(int start, int end, Dictionary<int, int> parents)
         {
             var current = end;
             while (current != start)
